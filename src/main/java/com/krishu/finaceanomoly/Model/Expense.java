@@ -1,5 +1,6 @@
 package com.krishu.finaceanomoly.Model;
 
+import com.krishu.finaceanomoly.ExpenseCategory;
 import com.krishu.finaceanomoly.ExpenseStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -25,14 +26,14 @@ public class Expense {
     private LocalDate expenseDate;
     private String submittedBy;
     private String description;
-    private String category;
+    @Enumerated(EnumType.STRING)
+    private ExpenseCategory category;
 
     @Enumerated(EnumType.STRING)
     private ExpenseStatus status;
 
-    private String aiCategory;
-    private String aiConfidence;
-    private String aiAnomalyFlag;
+    private Double aiConfidence;
+    private Boolean aiAnomalyFlag;
     private String aiReasoning;
 
     private LocalDateTime createdAt;

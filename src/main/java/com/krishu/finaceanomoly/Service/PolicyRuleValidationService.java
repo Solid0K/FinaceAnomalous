@@ -1,6 +1,7 @@
 package com.krishu.finaceanomoly.Service;
 
 import com.krishu.finaceanomoly.ExpenseStatus;
+import com.krishu.finaceanomoly.LLM_Feature.LLMClient;
 import com.krishu.finaceanomoly.LogWriter;
 import com.krishu.finaceanomoly.Model.AuditLog;
 import com.krishu.finaceanomoly.Model.Expense;
@@ -23,7 +24,7 @@ public class PolicyRuleValidationService {
     private final ExpenseRepo expenseRepo;
     private final AuditLogRepo auditLogRepo;
 
-    public PolicyRuleValidationService(PolicyRuleRepo policyRuleRepo,ExpenseRepo expenseRepo,AuditLogRepo auditLogRepo){
+    public PolicyRuleValidationService(PolicyRuleRepo policyRuleRepo, ExpenseRepo expenseRepo, AuditLogRepo auditLogRepo){
         this.policyRuleRepo=policyRuleRepo;
         this.expenseRepo=expenseRepo;
         this.auditLogRepo=auditLogRepo;
@@ -67,23 +68,24 @@ public class PolicyRuleValidationService {
     }
 
     private String checkCategoryLimit(Expense expense, PolicyRule policy) {
-        if(expense.getCategory()==null){
+        if(!expense.getCategory().equals(policy.getCategory())){
             return null;
         }
-        if(!expense.getCategory().equalsIgnoreCase(policy.getCategory())){
-            return null;
-        }
-        BigDecimal currAmount=expenseRepo.sumOfExpensesByCategory(expense.getCategory(),expense.getId());
-        if((currAmount.add((expense.getAmount()))).compareTo(policy.getCategoryThreshold())>0){
-            return String.format("Amount %s rupees will make CategoryTotal %s rupees exceeds the Threshold_Category_Amount %s rupees"
-                    ,expense.getAmount(),currAmount,policy.getCategoryThreshold());
+        LocalDate[] range=resolvePeriod(expense,policy);
+        BigDecimal currAmount=expenseRepo.sumOfExpensesByCategory(expense.getCategory(),expense.getId(),range[0],range[1]);
+        if(currAmount.add(expense.getAmount()).compareTo(policy.getCategoryThreshold())>0){
+            return String.format("Total %s spend (%s) in %s exceeds limit of %s",
+                    policy.getCategory(), currAmount.add(expense.getAmount()), policy.getPeriod(), policy.getCategoryThreshold());
         }
         return null;
     }
 
     private String checkAmount(Expense expense, PolicyRule policy) {
+        if(!expense.getCategory().equals(policy.getCategory())){
+            return null;
+        }
         if(expense.getAmount().compareTo(policy.getAmountThreshold())>0){
-            return String.format("Amount %s exceed the threshold amount %s",expense.getAmount(),policy.getAmountThreshold());
+            return String.format("Amount %s exceeds max allowed %s for category %s", expense.getAmount(), policy.getAmountThreshold(), policy.getCategory());
         }
         return null;
     }
@@ -96,5 +98,19 @@ public class PolicyRuleValidationService {
         auditlog.setDetail(message);
         auditlog.setTimeStamp(LocalDateTime.now());
         auditLogRepo.save(auditlog);
+    }
+
+    private LocalDate[] resolvePeriod(Expense expense,PolicyRule policy){
+        return switch(policy.getPeriod()){
+            case MONTHLY->new LocalDate[]{expense.getExpenseDate().withDayOfMonth(1),expense.getExpenseDate().
+                    withDayOfMonth(expense.getExpenseDate().lengthOfMonth())};
+            case QUARTERLY -> {
+                int quarterStartMonth = ((expense.getExpenseDate().getMonthValue() - 1) / 3) * 3 + 1;
+                LocalDate start = LocalDate.of(expense.getExpenseDate().getYear(), quarterStartMonth, 1);
+                yield new LocalDate[]{ start, start.plusMonths(3).minusDays(1) };
+            }
+            case YEARLY->new LocalDate[]{expense.getExpenseDate().withDayOfYear(1),expense.
+                    getExpenseDate().withDayOfYear(expense.getExpenseDate().lengthOfYear())};
+        };
     }
 }

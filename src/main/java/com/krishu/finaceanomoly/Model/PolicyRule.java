@@ -1,5 +1,7 @@
 package com.krishu.finaceanomoly.Model;
 
+import com.krishu.finaceanomoly.ExpenseCategory;
+import com.krishu.finaceanomoly.PolicyPeriod;
 import com.krishu.finaceanomoly.RuleType;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -21,9 +23,12 @@ public class PolicyRule {
     @Enumerated(EnumType.STRING)
     private RuleType type;
 
-    private String category;
+    @Enumerated(EnumType.STRING)
+    private ExpenseCategory category;
     private BigDecimal amountThreshold;
     private BigDecimal categoryThreshold;
     private Integer duplicateWindowDay;
     private boolean active;
+    @Enumerated(EnumType.STRING)
+    private PolicyPeriod period;
 }

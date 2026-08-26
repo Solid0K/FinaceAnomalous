@@ -1,5 +1,6 @@
 package com.krishu.finaceanomoly.Repository;
 
+import com.krishu.finaceanomoly.ExpenseCategory;
 import com.krishu.finaceanomoly.ExpenseStatus;
 import com.krishu.finaceanomoly.Model.Expense;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +16,7 @@ import java.util.UUID;
 public interface ExpenseRepo extends JpaRepository<Expense, UUID> {
     List<Expense> findByVendorAndAmountAndExpenseDateBetween(String vendor, BigDecimal amount, LocalDate start, LocalDate end);
     List<Expense> findByStatus(ExpenseStatus status);
-    @Query("select coalesce(sum(e.amount),0) from Expense e where e.category=:category and e.id!=:expenseId")
-    BigDecimal sumOfExpensesByCategory(@Param("category") String category,@Param("expenseId") UUID expenseId);
+    @Query("select coalesce(sum(e.amount),0) from Expense e where e.category=:category and e.id!=:expenseId and e.expenseDate between :start and :end and e.status=APPROVED")
+    BigDecimal sumOfExpensesByCategory(@Param("category") ExpenseCategory category,
+                                       @Param("expenseId") UUID expenseId,@Param("start") LocalDate start,@Param("end") LocalDate end);
 }

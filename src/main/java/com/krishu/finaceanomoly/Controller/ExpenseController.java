@@ -2,8 +2,10 @@ package com.krishu.finaceanomoly.Controller;
 
 import com.krishu.finaceanomoly.DTO.ExpenseRequest;
 import com.krishu.finaceanomoly.DTO.ExpenseResponse;
+import com.krishu.finaceanomoly.DTO.ExpenseSummaryResponse;
 import com.krishu.finaceanomoly.ExpenseStatus;
 import com.krishu.finaceanomoly.Service.ExpenseService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,7 +25,7 @@ public class ExpenseController {
     }
 
     @PostMapping()
-    public ResponseEntity<ExpenseResponse> createExpense(@RequestBody ExpenseRequest request){
+    public ResponseEntity<ExpenseResponse> createExpense(@Valid @RequestBody ExpenseRequest request){
         return ResponseEntity.ok(expenseService.createExpense(request));
     }
 
@@ -45,5 +47,10 @@ public class ExpenseController {
     @GetMapping("/oneExpense/{expenseId}")
     public ResponseEntity<ExpenseResponse> getOneExpense(@PathVariable UUID expenseId){
         return ResponseEntity.ok(expenseService.getOneExpense(expenseId));
+    }
+
+    @GetMapping("/summary")
+    public ResponseEntity<ExpenseSummaryResponse> expenseSummary(@RequestParam(required = false) Integer year,@RequestParam(required = false) Integer month){
+        return ResponseEntity.ok(expenseService.getExpenseSummary(year,month));
     }
 }

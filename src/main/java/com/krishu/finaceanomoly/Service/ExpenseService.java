@@ -3,7 +3,9 @@ package com.krishu.finaceanomoly.Service;
 import com.krishu.finaceanomoly.CustomException.NotFoundException;
 import com.krishu.finaceanomoly.DTO.ExpenseRequest;
 import com.krishu.finaceanomoly.DTO.ExpenseResponse;
+import com.krishu.finaceanomoly.DTO.ExpenseSummaryResponse;
 import com.krishu.finaceanomoly.DTO.LLmCategorizeResult;
+import com.krishu.finaceanomoly.ExpenseCategory;
 import com.krishu.finaceanomoly.ExpenseStatus;
 import com.krishu.finaceanomoly.LLM_Feature.LLMClient;
 import com.krishu.finaceanomoly.LogWriter;
@@ -25,7 +27,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ExpenseService {
@@ -93,6 +97,22 @@ public class ExpenseService {
         Expense expense=expenseRepo.findById(expenseId).orElseThrow(()->new NotFoundException("Expense not found"));
         return mapToResponse(expense);
     }
+
+    public ExpenseSummaryResponse getExpenseSummary(Integer year, Integer month) {
+        LocalDate now=LocalDate.now();
+        int targetYear=(year!=null)?year:now.getYear();
+        int targetMonth=(month!=null)?month:now.getMonthValue();
+
+        LocalDate start=LocalDate.of(targetYear,targetMonth,1);
+        LocalDate end=start.withDayOfMonth(start.lengthOfMonth());
+        List<Expense> expenses=expenseRepo.findExpenseByExpenseDateBetween(start,end);
+        BigDecimal totalAmount=expenses.stream().map(Expense::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
+        Map<ExpenseCategory,BigDecimal> byCategory=expenses.stream().
+                collect(Collectors.groupingBy(Expense::getCategory,Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)));
+        Map<ExpenseStatus,Long> byStatus=expenses.stream().collect(Collectors.groupingBy(Expense::getStatus,Collectors.counting()));
+        return new ExpenseSummaryResponse(totalAmount, (long) expenses.size(),byCategory,byStatus,start,end);
+    }
+
 
     private ExpenseResponse mapToResponse(Expense expense){
         return new ExpenseResponse(expense.getId(),expense.getVendor(),

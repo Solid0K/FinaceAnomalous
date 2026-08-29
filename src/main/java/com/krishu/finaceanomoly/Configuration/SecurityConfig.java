@@ -35,7 +35,7 @@ public class SecurityConfig {
                 .hasAnyRole("EMPLOYEE","CONTROLLER","ADMIN").requestMatchers(HttpMethod.GET,"/expense/**")
                 .hasAnyRole("EMPLOYEE","CONTROLLER","ADMIN").requestMatchers("/expenseReport").hasAnyRole("CONTROLLER","ADMIN")
                 .requestMatchers("/logs/**").hasAnyRole("CONTROLLER","ADMIN").
-                requestMatchers("/expense/mannualReview/").hasAnyRole("CONTROLLER","ADMIN").requestMatchers("/admin/**").hasRole("ADMIN").anyRequest().authenticated());
+                requestMatchers("/expense/mannualReview/**").hasAnyRole("CONTROLLER","ADMIN").requestMatchers("/admin/**").hasRole("ADMIN").anyRequest().authenticated());
         https.addFilterBefore(jwtfilter, UsernamePasswordAuthenticationFilter.class);
         return https.build();
     }

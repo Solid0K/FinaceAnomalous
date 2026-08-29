@@ -1,10 +1,9 @@
 package com.krishu.finaceanomoly.Service;
 
+import com.krishu.finaceanomoly.CustomException.AccessNotAllowedException;
 import com.krishu.finaceanomoly.CustomException.NotFoundException;
-import com.krishu.finaceanomoly.DTO.ExpenseRequest;
-import com.krishu.finaceanomoly.DTO.ExpenseResponse;
-import com.krishu.finaceanomoly.DTO.ExpenseSummaryResponse;
-import com.krishu.finaceanomoly.DTO.LLmCategorizeResult;
+import com.krishu.finaceanomoly.CustomException.OnlyFlaggedReviewException;
+import com.krishu.finaceanomoly.DTO.*;
 import com.krishu.finaceanomoly.ExpenseCategory;
 import com.krishu.finaceanomoly.ExpenseStatus;
 import com.krishu.finaceanomoly.LLM_Feature.LLMClient;
@@ -16,6 +15,7 @@ import com.krishu.finaceanomoly.Repository.ExpenseRepo;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -46,21 +46,21 @@ public class ExpenseService {
         this.logRepo = logRepo;
     }
 
-    public ExpenseResponse createExpense(ExpenseRequest request) {
+    public ExpenseResponse createExpense(ExpenseRequest request, Authentication authentication) {
         Expense expense=new Expense();
         expense.setVendor(request.vendor());
         expense.setAmount(request.amount());
         expense.setCurrency(request.currency());
         expense.setExpenseDate(request.expenseDate());
         expense.setDescription(request.description());
-        expense.setSubmittedBy(request.submittedBy());
+        expense.setSubmittedBy(authentication.getName());
         expense.setCreatedAt(LocalDateTime.now());
         expense.setStatus(ExpenseStatus.PENDING);
         Expense savedExpense=expenseRepo.save(expense);
         return mapToResponse(fullValidationPipeline(savedExpense));
     }
 
-    public List<ExpenseResponse> creatExpenseInBulk(MultipartFile file) throws IOException {
+    public List<ExpenseResponse> creatExpenseInBulk(MultipartFile file,Authentication authentication) throws IOException {
         List<Expense> expenses=new ArrayList<>();
         CSVFormat csvformat=CSVFormat.DEFAULT.builder().
                 setHeader().setSkipHeaderRecord(true).setIgnoreHeaderCase(true).setTrim(true).build();
@@ -73,7 +73,7 @@ public class ExpenseService {
                 expense.setCurrency(record.get("currency"));
                 expense.setExpenseDate(LocalDate.parse(record.get("expenseDate")));
                 expense.setDescription(record.get("description"));
-                expense.setSubmittedBy(record.get("submittedBy"));
+                expense.setSubmittedBy(authentication.getName());
                 expense.setCreatedAt(LocalDateTime.now());
                 expense.setStatus(ExpenseStatus.PENDING);
                 expenses.add(expense);
@@ -84,33 +84,49 @@ public class ExpenseService {
         return updatedExpense.stream().map(this::mapToResponse).toList();
     }
 
-    public List<ExpenseResponse> getExpenses() {
-        List<Expense> allExpenses=expenseRepo.findAll();
+    public List<ExpenseResponse> getExpenses(Authentication authentication) {
+        List<Expense> allExpenses=isReviewer(authentication)?expenseRepo.findAll():expenseRepo.findBySubmittedBy(authentication.getName());
         return allExpenses.stream().map(this::mapToResponse).toList();
     }
 
-    public List<ExpenseResponse> getExpenseByStatus(ExpenseStatus status) {
-        return expenseRepo.findByStatus(status).stream().map(this::mapToResponse).toList();
+    public List<ExpenseResponse> getExpenseByStatus(ExpenseStatus status,Authentication authentication) {
+        List<Expense> expenses=isReviewer(authentication)?expenseRepo.
+                findByStatus(status):expenseRepo.findByStatusAndSubmittedBy(status,authentication.getName());
+        return expenses.stream().map(this::mapToResponse).toList();
     }
 
-    public ExpenseResponse getOneExpense(UUID expenseId) {
+    public ExpenseResponse getOneExpense(UUID expenseId,Authentication authentication) {
         Expense expense=expenseRepo.findById(expenseId).orElseThrow(()->new NotFoundException("Expense not found"));
+        if(!isReviewer(authentication) && !expense.getSubmittedBy().equals(authentication.getName())){
+            throw new AccessNotAllowedException("Access Not Allowed");
+        }
         return mapToResponse(expense);
     }
 
-    public ExpenseSummaryResponse getExpenseSummary(Integer year, Integer month) {
+    public ExpenseSummaryResponse getExpenseSummary(Integer year, Integer month,Authentication authentication) {
         LocalDate now=LocalDate.now();
         int targetYear=(year!=null)?year:now.getYear();
         int targetMonth=(month!=null)?month:now.getMonthValue();
 
         LocalDate start=LocalDate.of(targetYear,targetMonth,1);
         LocalDate end=start.withDayOfMonth(start.lengthOfMonth());
-        List<Expense> expenses=expenseRepo.findExpenseByExpenseDateBetween(start,end);
+        List<Expense> expenses=expenseRepo.findExpenseByExpenseDateBetweenAndSubmittedBy(start,end,authentication.getName());
         BigDecimal totalAmount=expenses.stream().map(Expense::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
         Map<ExpenseCategory,BigDecimal> byCategory=expenses.stream().
                 collect(Collectors.groupingBy(Expense::getCategory,Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)));
         Map<ExpenseStatus,Long> byStatus=expenses.stream().collect(Collectors.groupingBy(Expense::getStatus,Collectors.counting()));
         return new ExpenseSummaryResponse(totalAmount, (long) expenses.size(),byCategory,byStatus,start,end);
+    }
+
+    public ExpenseResponse manualReview(UUID expenseId,ReviewRequest request, Authentication authentication){
+        Expense expense=expenseRepo.findById(expenseId).orElseThrow(()->new NotFoundException("Expense not found"));
+        if(expense.getStatus()!=ExpenseStatus.FLAGGED){
+            throw new OnlyFlaggedReviewException("Only Flagged expense can Reviewed");
+        }
+        expense.setStatus(request.decision());
+        Expense savedExpense=expenseRepo.save(expense);
+        manualLog(savedExpense,request.note(),authentication.getName());
+        return mapToResponse(savedExpense);
     }
 
 
@@ -151,5 +167,20 @@ public class ExpenseService {
         log.setDetail(result.reasoning());
         log.setTimeStamp(LocalDateTime.now());
         logRepo.save(log);
+    }
+
+    private void manualLog(Expense expense,String note,String email){
+        AuditLog log=new AuditLog();
+        log.setExpense(expense);
+        log.setWriter(LogWriter.USER);
+        log.setAction("MANUALLY_" + expense.getStatus().name());
+        log.setDetail(String.format("Reviewed by %s. Note: %s",email,(note!= null)?note:"No note provided"));
+        log.setTimeStamp(LocalDateTime.now());
+        logRepo.save(log);
+    }
+
+    private boolean isReviewer(Authentication authentication){
+        return authentication.getAuthorities()
+                .stream().anyMatch(a->a.getAuthority().equals("ROLE_CONTROLLER") || a.getAuthority().equals("ROLE_ADMIN"));
     }
 }

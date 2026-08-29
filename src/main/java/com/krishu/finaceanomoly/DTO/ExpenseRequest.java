@@ -10,5 +10,5 @@ import java.time.LocalDate;
 
 public record ExpenseRequest(@NotNull String vendor, @NotNull @DecimalMin(value="0.01",message="Amount should be positive") BigDecimal amount
         , @NotNull String currency
-        , @NotNull @PastOrPresent(message="Expense couldn't be future") LocalDate expenseDate,@NotNull String submittedBy
+        , @NotNull @PastOrPresent(message="Expense couldn't be future") LocalDate expenseDate
         ,@NotNull @Size(max=500,message="desc should be in 500 words") String description) {}

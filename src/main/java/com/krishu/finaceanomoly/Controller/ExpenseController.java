@@ -3,10 +3,12 @@ package com.krishu.finaceanomoly.Controller;
 import com.krishu.finaceanomoly.DTO.ExpenseRequest;
 import com.krishu.finaceanomoly.DTO.ExpenseResponse;
 import com.krishu.finaceanomoly.DTO.ExpenseSummaryResponse;
+import com.krishu.finaceanomoly.DTO.ReviewRequest;
 import com.krishu.finaceanomoly.ExpenseStatus;
 import com.krishu.finaceanomoly.Service.ExpenseService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,32 +27,37 @@ public class ExpenseController {
     }
 
     @PostMapping()
-    public ResponseEntity<ExpenseResponse> createExpense(@Valid @RequestBody ExpenseRequest request){
-        return ResponseEntity.ok(expenseService.createExpense(request));
+    public ResponseEntity<ExpenseResponse> createExpense(@Valid @RequestBody ExpenseRequest request, Authentication authentication){
+        return ResponseEntity.ok(expenseService.createExpense(request,authentication));
     }
 
     @PostMapping("/bulk")
-    public ResponseEntity<List<ExpenseResponse>> bulkCreation(@RequestParam("file") MultipartFile file) throws IOException {
-        return ResponseEntity.ok(expenseService.creatExpenseInBulk(file));
+    public ResponseEntity<List<ExpenseResponse>> bulkCreation(@RequestParam("file") MultipartFile file,Authentication authentication) throws IOException {
+        return ResponseEntity.ok(expenseService.creatExpenseInBulk(file,authentication));
     }
 
     @GetMapping()
-    public ResponseEntity<List<ExpenseResponse>> getExpenses(){
-        return ResponseEntity.ok(expenseService.getExpenses());
+    public ResponseEntity<List<ExpenseResponse>> getExpenses(Authentication authentication){
+        return ResponseEntity.ok(expenseService.getExpenses(authentication));
     }
 
     @GetMapping("/byStatus")
-    public ResponseEntity<List<ExpenseResponse>> getExpenseByStatus(@RequestParam("status") ExpenseStatus status){
-        return ResponseEntity.ok(expenseService.getExpenseByStatus(status));
+    public ResponseEntity<List<ExpenseResponse>> getExpenseByStatus(@RequestParam("status") ExpenseStatus status,Authentication authentication){
+        return ResponseEntity.ok(expenseService.getExpenseByStatus(status,authentication));
     }
 
     @GetMapping("/oneExpense/{expenseId}")
-    public ResponseEntity<ExpenseResponse> getOneExpense(@PathVariable UUID expenseId){
-        return ResponseEntity.ok(expenseService.getOneExpense(expenseId));
+    public ResponseEntity<ExpenseResponse> getOneExpense(@PathVariable UUID expenseId,Authentication authentication){
+        return ResponseEntity.ok(expenseService.getOneExpense(expenseId,authentication));
     }
 
     @GetMapping("/summary")
-    public ResponseEntity<ExpenseSummaryResponse> expenseSummary(@RequestParam(required = false) Integer year,@RequestParam(required = false) Integer month){
-        return ResponseEntity.ok(expenseService.getExpenseSummary(year,month));
+    public ResponseEntity<ExpenseSummaryResponse> expenseSummary(@RequestParam(required = false) Integer year,@RequestParam(required = false) Integer month,Authentication authentication){
+        return ResponseEntity.ok(expenseService.getExpenseSummary(year,month,authentication));
+    }
+
+    @PatchMapping("/mannualReview/{expenseId}")
+    public ResponseEntity<ExpenseResponse> manualReviewing(@PathVariable UUID expenseId, @RequestBody ReviewRequest request,Authentication authentication){
+        return ResponseEntity.ok(expenseService.manualReview(expenseId,request,authentication));
     }
 }

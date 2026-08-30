@@ -20,6 +20,7 @@ public interface ExpenseRepo extends JpaRepository<Expense, UUID> {
     BigDecimal sumOfExpensesByCategory(@Param("category") ExpenseCategory category,
                                        @Param("expenseId") UUID expenseId,@Param("start") LocalDate start,@Param("end") LocalDate end);
     List<Expense> findExpenseByExpenseDateBetweenAndSubmittedBy(LocalDate start,LocalDate end,String email);
+    List<Expense> findExpenseByExpenseDateBetween(LocalDate start,LocalDate end);
     List<Expense> findBySubmittedBy(String email);
     List<Expense> findByStatusAndSubmittedBy(ExpenseStatus status,String email);
 }

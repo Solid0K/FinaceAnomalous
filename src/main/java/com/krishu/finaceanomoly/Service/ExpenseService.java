@@ -110,7 +110,8 @@ public class ExpenseService {
 
         LocalDate start=LocalDate.of(targetYear,targetMonth,1);
         LocalDate end=start.withDayOfMonth(start.lengthOfMonth());
-        List<Expense> expenses=expenseRepo.findExpenseByExpenseDateBetweenAndSubmittedBy(start,end,authentication.getName());
+        List<Expense> expenses=isReviewer(authentication)?expenseRepo.findExpenseByExpenseDateBetween(start,end):expenseRepo
+                .findExpenseByExpenseDateBetweenAndSubmittedBy(start,end,authentication.getName());
         BigDecimal totalAmount=expenses.stream().map(Expense::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
         Map<ExpenseCategory,BigDecimal> byCategory=expenses.stream().
                 collect(Collectors.groupingBy(Expense::getCategory,Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)));

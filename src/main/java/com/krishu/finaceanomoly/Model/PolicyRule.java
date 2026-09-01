@@ -4,6 +4,7 @@ import com.krishu.finaceanomoly.ExpenseCategory;
 import com.krishu.finaceanomoly.PolicyPeriod;
 import com.krishu.finaceanomoly.RuleType;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -31,4 +32,7 @@ public class PolicyRule {
     private boolean active;
     @Enumerated(EnumType.STRING)
     private PolicyPeriod period;
+    @Size(max=300)
+    @Column(length=300)
+    private String ruleText;
 }

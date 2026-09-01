@@ -39,6 +39,7 @@ public class PolicyRuleValidationService {
                 case AMOUNT_LIMIT->checkAmount(expense,policy);
                 case CATEGORY_LIMIT->checkCategoryLimit(expense,policy);
                 case DUPLICATE_CHECK->checkDuplicateWindow(expense,policy);
+                case CUSTOM->checkCustomPolicy(expense,policy);
             };
             if(violation!=null){
                 anyViolation=true;
@@ -51,6 +52,10 @@ public class PolicyRuleValidationService {
             expense.setStatus(ExpenseStatus.APPROVED);
             Log(expense,"APPROVED","Passed all Policies");
         }
+    }
+
+    private String checkCustomPolicy(Expense expense, PolicyRule policy) {
+        return null;
     }
 
     private String checkDuplicateWindow(Expense expense, PolicyRule policy) {

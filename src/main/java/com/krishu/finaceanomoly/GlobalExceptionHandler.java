@@ -45,4 +45,16 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse=new ErrorResponse(409,exp.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
+
+    @ExceptionHandler(PolicyConflictException.class)
+    public ResponseEntity<ErrorResponse> PolicyConflict(PolicyConflictException exp){
+        ErrorResponse errorResponse=new ErrorResponse(409,exp.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
+
+    @ExceptionHandler(PolicyTypeConflictException.class)
+    public ResponseEntity<ErrorResponse> PolicyTypeConflict(PolicyTypeConflictException exp){
+        ErrorResponse errorResponse=new ErrorResponse(409,exp.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
 }

@@ -1,15 +1,20 @@
 package com.krishu.finaceanomoly.Service;
 
 import com.krishu.finaceanomoly.CustomException.EmailAlreadyExistException;
-import com.krishu.finaceanomoly.DTO.CreateUserRequest;
-import com.krishu.finaceanomoly.DTO.UserResponse;
+import com.krishu.finaceanomoly.CustomException.NotFoundException;
+import com.krishu.finaceanomoly.CustomException.PolicyConflictException;
+import com.krishu.finaceanomoly.CustomException.PolicyTypeConflictException;
+import com.krishu.finaceanomoly.DTO.*;
 import com.krishu.finaceanomoly.Model.Client;
+import com.krishu.finaceanomoly.Model.PolicyRule;
 import com.krishu.finaceanomoly.Repository.ClientRepo;
-import com.krishu.finaceanomoly.Role;
+import com.krishu.finaceanomoly.Repository.PolicyRuleRepo;
+import com.krishu.finaceanomoly.RuleType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 public class AdminService {

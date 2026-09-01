@@ -3,5 +3,6 @@ package com.krishu.finaceanomoly;
 public enum RuleType {
     AMOUNT_LIMIT,
     CATEGORY_LIMIT,
-    DUPLICATE_CHECK
+    DUPLICATE_CHECK,
+    CUSTOM
 }

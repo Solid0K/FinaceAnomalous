@@ -1,5 +1,6 @@
 package com.krishu.finaceanomoly.Service;
 
+import com.krishu.finaceanomoly.DTO.CustomPolicyVerdict;
 import com.krishu.finaceanomoly.ExpenseStatus;
 import com.krishu.finaceanomoly.LLM_Feature.LLMClient;
 import com.krishu.finaceanomoly.LogWriter;
@@ -9,12 +10,13 @@ import com.krishu.finaceanomoly.Model.PolicyRule;
 import com.krishu.finaceanomoly.Repository.AuditLogRepo;
 import com.krishu.finaceanomoly.Repository.ExpenseRepo;
 import com.krishu.finaceanomoly.Repository.PolicyRuleRepo;
+import com.krishu.finaceanomoly.RuleType;
+import org.apache.tomcat.util.digester.Rule;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -23,11 +25,13 @@ public class PolicyRuleValidationService {
     private final PolicyRuleRepo policyRuleRepo;
     private final ExpenseRepo expenseRepo;
     private final AuditLogRepo auditLogRepo;
+    private final LLMClient llmClient;
 
-    public PolicyRuleValidationService(PolicyRuleRepo policyRuleRepo, ExpenseRepo expenseRepo, AuditLogRepo auditLogRepo){
+    public PolicyRuleValidationService(PolicyRuleRepo policyRuleRepo, ExpenseRepo expenseRepo, AuditLogRepo auditLogRepo, LLMClient llmClient){
         this.policyRuleRepo=policyRuleRepo;
         this.expenseRepo=expenseRepo;
         this.auditLogRepo=auditLogRepo;
+        this.llmClient = llmClient;
     }
 
     public void validate(Expense expense){
@@ -43,18 +47,23 @@ public class PolicyRuleValidationService {
             };
             if(violation!=null){
                 anyViolation=true;
-                Log(expense,"FLAGGED_"+policy.getType(),violation);
+                LogWriter writer=policy.getType() == RuleType.CUSTOM ? LogWriter.AI : LogWriter.SYSTEM;
+                Log(expense,"FLAGGED_"+policy.getType(),violation,writer);
             }
         }
         if(anyViolation){
             expense.setStatus(ExpenseStatus.FLAGGED);
         }else{
             expense.setStatus(ExpenseStatus.APPROVED);
-            Log(expense,"APPROVED","Passed all Policies");
+            Log(expense,"APPROVED","Passed all Policies",LogWriter.SYSTEM);
         }
     }
 
     private String checkCustomPolicy(Expense expense, PolicyRule policy) {
+        CustomPolicyVerdict validation=llmClient.checkCustomPolicy(expense,policy);
+        if(validation.violated()){
+            return validation.resoning();
+        }
         return null;
     }
 
@@ -95,11 +104,11 @@ public class PolicyRuleValidationService {
         return null;
     }
 
-    private void Log(Expense expense, String action, String message) {
+    private void Log(Expense expense, String action, String message,LogWriter writer) {
         AuditLog auditlog=new AuditLog();
         auditlog.setExpense(expense);
         auditlog.setAction(action);
-        auditlog.setWriter(LogWriter.SYSTEM);
+        auditlog.setWriter(writer);
         auditlog.setDetail(message);
         auditlog.setTimeStamp(LocalDateTime.now());
         auditLogRepo.save(auditlog);

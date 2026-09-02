@@ -1,9 +1,11 @@
 package com.krishu.finaceanomoly.LLM_Feature;
 
+import com.krishu.finaceanomoly.DTO.CustomPolicyVerdict;
 import com.krishu.finaceanomoly.DTO.GeminiResponse;
 import com.krishu.finaceanomoly.DTO.LLmCategorizeResult;
 import com.krishu.finaceanomoly.ExpenseCategory;
 import com.krishu.finaceanomoly.Model.Expense;
+import com.krishu.finaceanomoly.Model.PolicyRule;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,15 @@ public class GeminiClient implements LLMClient{
         return parseResponse(response);
     }
 
+    @Override
+    public CustomPolicyVerdict checkCustomPolicy(Expense expense, PolicyRule policy) {
+        String promptForClient=buildCustomPolicyPrompt(expense,policy);
+        Map<String,Object> request=Map.of("contents",List.of(Map.of("parts",List.of(Map.of("text",promptForClient)))));
+        GeminiResponse response=restClient.post().uri(url+"?key="+key).
+                contentType(MediaType.APPLICATION_JSON).body(request).retrieve().body(GeminiResponse.class);
+        return parseCustomPolicyResponse(response);
+    }
+
 
     private LLmCategorizeResult parseResponse(GeminiResponse response) {
         try {
@@ -55,5 +66,33 @@ public class GeminiClient implements LLMClient{
          "confidence": a number between 0 and 1,
          "reasoning": "one sentence explaining your categorization and any anomaly concern"}
         """.formatted(expense.getVendor(), expense.getAmount(), expense.getCurrency(), expense.getDescription());
+    }
+
+    private String buildCustomPolicyPrompt(Expense expense, PolicyRule policy) {
+        return """
+        You are a finance controller checking one expense against a single custom policy rule.
+        Respond ONLY with valid JSON, no other text.
+
+        Policy rule: %s
+
+        Expense details:
+        Vendor: %s
+        Amount: %s %s
+        Description: %s
+
+        Respond with this exact JSON structure:
+        {"violated": true or false,
+         "reasoning": "one sentence explaining whether this expense violates the policy rule above"}
+        """.formatted(policy.getRuleText(), expense.getVendor(), expense.getAmount(), expense.getCurrency(), expense.getDescription());
+    }
+
+    private CustomPolicyVerdict parseCustomPolicyResponse(GeminiResponse response) {
+        try {
+            String generatedJson=response.candidates().getFirst().content().parts().getFirst().text();
+            generatedJson = generatedJson.replace("```json", "").replace("```", "").trim();
+            return mapper.readValue(generatedJson, CustomPolicyVerdict.class);
+        } catch (Exception e) {
+            return new CustomPolicyVerdict(false,"Custom policy check failed: " + e.getMessage());
+        }
     }
 }
